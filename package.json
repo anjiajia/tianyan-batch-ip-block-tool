@@ -1,6 +1,6 @@
 {
   "name": "tianyan-batch-ip-block-tool",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "private": true,
   "description": "Local GUI tool for batch blocking IPs exported from Tianyan alerts.",
   "type": "module",
@@ -10,9 +10,9 @@
     "dev": "node src/server.js",
     "electron": "electron .",
     "dist": "electron-builder",
-    "dist:win": "electron-builder --win",
-    "dist:mac": "electron-builder --mac",
-    "dist:linux": "electron-builder --linux"
+    "dist:win": "electron-builder --win portable --publish never",
+    "dist:mac": "electron-builder --mac zip --publish never",
+    "dist:linux": "electron-builder --linux AppImage tar.gz --publish never"
   },
   "engines": {
     "node": ">=18"
@@ -23,7 +23,7 @@
   },
   "build": {
     "appId": "com.anjiajia.tianyanBatchIpBlockTool",
-    "productName": "天眼批量封禁工具",
+    "productName": "Tianyan Batch IP Block Tool",
     "asar": true,
     "files": [
       "src/**/*",
@@ -37,32 +37,24 @@
     },
     "win": {
       "target": [
-        "nsis",
         "portable"
       ],
-      "artifactName": "tianyan-batch-ip-block-tool-${version}-windows-${arch}.${ext}",
+      "artifactName": "tianyan-batch-ip-block-tool-${version}-windows-${arch}-portable.${ext}",
       "signAndEditExecutable": false
     },
     "mac": {
       "target": [
-        "dmg",
         "zip"
       ],
-      "artifactName": "tianyan-batch-ip-block-tool-${version}-mac-${arch}.${ext}"
+      "artifactName": "tianyan-batch-ip-block-tool-${version}-mac-${arch}.${ext}",
+      "identity": null
     },
     "linux": {
       "target": [
         "AppImage",
-        "deb",
         "tar.gz"
       ],
       "artifactName": "tianyan-batch-ip-block-tool-${version}-linux-${arch}.${ext}"
-    },
-    "nsis": {
-      "artifactName": "tianyan-batch-ip-block-tool-${version}-windows-${arch}-setup.${ext}"
-    },
-    "portable": {
-      "artifactName": "tianyan-batch-ip-block-tool-${version}-windows-${arch}-portable.${ext}"
     }
   },
   "author": "anjiajia <1334352581@qq.com>"
