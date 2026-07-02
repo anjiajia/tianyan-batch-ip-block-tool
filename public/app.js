@@ -97,6 +97,8 @@ const FIREWALL_PRESETS = [
   },
 ];
 
+const CONFIG_STORAGE_KEY = "tianyanBatchIpBlockTool.config.v1";
+
 const state = { file: null, candidates: [], results: [] };
 
 const els = {
@@ -134,6 +136,10 @@ const els = {
   dryRunInput: document.querySelector("#dryRunInput"),
   ignoreTlsInput: document.querySelector("#ignoreTlsInput"),
   loadExampleButton: document.querySelector("#loadExampleButton"),
+  saveConfigButton: document.querySelector("#saveConfigButton"),
+  loadConfigButton: document.querySelector("#loadConfigButton"),
+  clearConfigButton: document.querySelector("#clearConfigButton"),
+  saveSecretsInput: document.querySelector("#saveSecretsInput"),
   runButton: document.querySelector("#runButton"),
   downloadButton: document.querySelector("#downloadButton"),
   logOutput: document.querySelector("#logOutput"),
@@ -152,6 +158,9 @@ els.clearButton.addEventListener("click", clearAll);
 els.selectAll.addEventListener("change", toggleSelectAll);
 els.firewallPresetInput.addEventListener("change", () => applyPreset(els.firewallPresetInput.value));
 els.loadExampleButton.addEventListener("click", () => applyPreset("generic-rest-json"));
+els.saveConfigButton.addEventListener("click", saveConfig);
+els.loadConfigButton.addEventListener("click", () => loadSavedConfig({ silent: false }));
+els.clearConfigButton.addEventListener("click", clearSavedConfig);
 els.runButton.addEventListener("click", runBlock);
 els.downloadButton.addEventListener("click", downloadResults);
 
@@ -164,6 +173,7 @@ function initPresets() {
     els.firewallPresetInput.appendChild(option);
   });
   applyPreset("qianxin-secaegis");
+  loadSavedConfig({ silent: true });
 }
 
 function applyPreset(id) {
@@ -285,7 +295,33 @@ async function runBlock() {
   let payload;
   try { payload = JSON.parse(els.payloadInput.value || "{}"); } catch (error) { return log(`Payload JSON is invalid: ${error.message}`); }
 
-  const config = {
+  const config = readConfigFromForm(payload);
+
+  const dryRun = els.dryRunInput.checked;
+  const confirmText = dryRun ? `模拟执行 ${ips.length} 个 IP，不会调用防火墙 API。` : `确认使用 ${currentPresetLabel(config.vendor)} 封禁 ${ips.length} 个 IP？`;
+  if (!window.confirm(confirmText)) return;
+
+  setBusy(true, dryRun ? "正在模拟执行..." : "正在调用防火墙适配器...");
+  try {
+    const response = await postJson("/api/block", { ips, config, ttl: Number(els.ttlInput.value), reason: els.reasonInput.value, dryRun, concurrency: Number(els.concurrencyInput.value) });
+    state.results = response.results;
+    els.downloadButton.disabled = state.results.length === 0;
+    const success = state.results.filter((item) => item.ok).length;
+    const failed = state.results.length - success;
+    const title = dryRun
+      ? `模拟执行完成：模拟 ${state.results.length} 条，防火墙调用 0 次`
+      : `Done: success=${success}, failed=${failed}`;
+    log([title, "", ...state.results.map(formatResultLine)].join("\n"));
+  } catch (error) {
+    log(`Run failed: ${error.message}`);
+  } finally {
+    setBusy(false);
+  }
+}
+
+function readConfigFromForm(payloadOverride) {
+  const payload = payloadOverride ?? JSON.parse(els.payloadInput.value || "{}");
+  return {
     vendor: els.firewallPresetInput.value,
     baseUrl: els.baseUrlInput.value.trim(),
     username: els.usernameInput.value,
@@ -307,24 +343,89 @@ async function runBlock() {
     reason: els.reasonInput.value,
     concurrency: Number(els.concurrencyInput.value),
   };
+}
 
-  const dryRun = els.dryRunInput.checked;
-  const confirmText = dryRun ? `Dry-run ${ips.length} IP(s). No firewall API call will be made.` : `Really block ${ips.length} IP(s) with ${preset?.label || config.vendor}?`;
-  if (!window.confirm(confirmText)) return;
-
-  setBusy(true, dryRun ? "Running dry-run..." : "Calling firewall adapter...");
-  try {
-    const response = await postJson("/api/block", { ips, config, ttl: Number(els.ttlInput.value), reason: els.reasonInput.value, dryRun, concurrency: Number(els.concurrencyInput.value) });
-    state.results = response.results;
-    els.downloadButton.disabled = state.results.length === 0;
-    const success = state.results.filter((item) => item.ok).length;
-    const failed = state.results.length - success;
-    log([`Done: success=${success}, failed=${failed}`, "", ...state.results.map((item) => `[${item.ok ? "OK" : "FAIL"}] ${item.ip} (${item.adapter}) -> ${item.status} ${item.response}`)].join("\n"));
-  } catch (error) {
-    log(`Run failed: ${error.message}`);
-  } finally {
-    setBusy(false);
+function applyConfigToForm(config) {
+  const vendor = config.vendor || "qianxin-secaegis";
+  if (FIREWALL_PRESETS.some((preset) => preset.id === vendor)) {
+    applyPreset(vendor);
   }
+  els.firewallPresetInput.value = vendor;
+  els.baseUrlInput.value = config.baseUrl || "";
+  els.usernameInput.value = config.username || config.apiKey || "";
+  els.passwordInput.value = config.password || config.apiSecret || "";
+  els.objectNameInput.value = config.objectName || "";
+  els.pwdLenInput.value = Number(config.pwdLen || 0);
+  els.endpointInput.value = config.endpoint || "";
+  els.methodInput.value = config.method || "POST";
+  els.successInput.value = Array.isArray(config.successStatus) ? config.successStatus.join(",") : (config.successStatus || "200,201,204");
+  els.tokenInput.value = config.token || "";
+  els.tokenHeaderInput.value = config.tokenHeader || "Authorization";
+  els.tokenPrefixInput.value = config.tokenPrefix ?? "Bearer ";
+  els.ttlInput.value = Number(config.ttlSeconds || 86400);
+  els.concurrencyInput.value = Number(config.concurrency || 3);
+  els.reasonInput.value = config.reason || "Tianyan batch block";
+  els.ignoreTlsInput.checked = Boolean(config.ignoreTlsErrors ?? true);
+  if (config.payload && typeof config.payload === "object") {
+    els.payloadInput.value = JSON.stringify(config.payload, null, 2);
+  }
+}
+
+function saveConfig() {
+  let config;
+  try {
+    config = readConfigFromForm();
+  } catch (error) {
+    log(`Config not saved: payload JSON is invalid: ${error.message}`);
+    return;
+  }
+  config.savedAt = new Date().toISOString();
+  config.saveSecrets = els.saveSecretsInput.checked;
+  if (!els.saveSecretsInput.checked) {
+    config.password = "";
+    config.apiSecret = "";
+    config.token = "";
+  }
+  localStorage.setItem(CONFIG_STORAGE_KEY, JSON.stringify(config));
+  log(els.saveSecretsInput.checked
+    ? "配置已保存到本机，包含密码/Token。请只在可信电脑上使用。"
+    : "配置已保存到本机，未保存密码/Token。");
+}
+
+function loadSavedConfig({ silent = false } = {}) {
+  const raw = localStorage.getItem(CONFIG_STORAGE_KEY);
+  if (!raw) {
+    if (!silent) log("未找到已保存的配置。");
+    return false;
+  }
+  try {
+    const config = JSON.parse(raw);
+    applyConfigToForm(config);
+    els.saveSecretsInput.checked = Boolean(config.saveSecrets);
+    if (!silent) log("已加载本机保存的配置。");
+    return true;
+  } catch (error) {
+    if (!silent) log(`已保存的配置无效：${error.message}`);
+    return false;
+  }
+}
+
+function clearSavedConfig() {
+  localStorage.removeItem(CONFIG_STORAGE_KEY);
+  els.saveSecretsInput.checked = false;
+  log("已清除本机保存的配置。");
+}
+
+function formatResultLine(item) {
+  if (item.dryRun || item.status === "DRY_RUN") {
+    return `[模拟] ${item.ip} (${item.adapter || "adapter"}) -> 仅模拟，未调用防火墙 API。`;
+  }
+  return `[${item.ok ? "OK" : "FAIL"}] ${item.ip} (${item.adapter || "adapter"}) -> ${item.status} ${item.response}`;
+}
+
+function currentPresetLabel(fallback) {
+  const preset = FIREWALL_PRESETS.find((item) => item.id === els.firewallPresetInput.value);
+  return preset ? decodeHtml(preset.label) : fallback;
 }
 
 function selectedIps() { return [...new Set(state.candidates.filter((item) => item.selected && !item.skip).map((item) => item.ip))]; }
@@ -353,5 +454,3 @@ function tag(text, type) { return `<span class="tag ${type}">${escapeHtml(text)}
 function csvCell(value) { const text = String(value ?? ""); return /[",\r\n]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text; }
 function decodeHtml(value) { const textarea = document.createElement("textarea"); textarea.innerHTML = String(value); return textarea.value; }
 function escapeHtml(value) { return String(value).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;"); }
-
-

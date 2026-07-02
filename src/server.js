@@ -91,7 +91,7 @@ async function handleBlock(req) {
   const adapter = getAdapter(config.vendor);
   const results = await runPool(ips, concurrency, async (ip) => {
     const result = dryRun
-      ? { ok: true, status: "DRY_RUN", response: `Adapter ${adapter.name}: skipped API call.` }
+      ? { ok: true, status: "DRY_RUN", response: `模拟执行：${adapter.name} 未调用防火墙 API。` }
       : await adapter.block(config, ip, ttl, reason);
     return {
       ip,
@@ -123,13 +123,13 @@ async function handleBlock(req) {
 
 function getAdapter(vendor) {
   const adapters = {
-    "qianxin-secaegis": { name: "Qianxin SecAutoBan", block: blockQianxin },
-    "topsec-secaegis": { name: "TopSec SecAutoBan", block: blockTopsec },
-    "sangfor-secaegis": { name: "Sangfor SecAutoBan", block: blockSangfor },
-    "opnsense-secaegis": { name: "OPNsense SecAutoBan", block: blockOpnsense },
-    "checkpoint-secaegis": { name: "Check Point SecAutoBan", block: blockCheckPoint },
+    "qianxin-secaegis": { name: "奇安信防火墙", block: blockQianxin },
+    "topsec-secaegis": { name: "天融信防火墙", block: blockTopsec },
+    "sangfor-secaegis": { name: "深信服防火墙", block: blockSangfor },
+    "opnsense-secaegis": { name: "OPNsense 别名 API", block: blockOpnsense },
+    "checkpoint-secaegis": { name: "Check Point 管理 API", block: blockCheckPoint },
   };
-  return adapters[vendor] || { name: "Generic HTTP", block: blockGenericHttp };
+  return adapters[vendor] || { name: "通用 HTTP", block: blockGenericHttp };
 }
 
 async function blockQianxin(config, ip) {
@@ -821,11 +821,3 @@ function clamp(value, min, max) {
   if (!Number.isFinite(value)) return min;
   return Math.max(min, Math.min(max, value));
 }
-
-
-
-
-
-
-
-
