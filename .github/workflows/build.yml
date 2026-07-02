@@ -21,6 +21,13 @@ jobs:
 
     env:
       CSC_IDENTITY_AUTO_DISCOVERY: false
+      CSC_LINK: ${{ secrets.CSC_LINK }}
+      CSC_KEY_PASSWORD: ${{ secrets.CSC_KEY_PASSWORD }}
+      WIN_CSC_LINK: ${{ secrets.WIN_CSC_LINK }}
+      WIN_CSC_KEY_PASSWORD: ${{ secrets.WIN_CSC_KEY_PASSWORD }}
+      APPLE_ID: ${{ secrets.APPLE_ID }}
+      APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+      APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
       USE_HARD_LINKS: false
 
     steps:
@@ -35,9 +42,13 @@ jobs:
       - name: Install dependencies
         run: npm install
 
-      - name: Build Windows package
-        if: matrix.os == 'windows-latest'
+      - name: Build unsigned Windows package
+        if: matrix.os == 'windows-latest' && env.WIN_CSC_LINK == '' && env.CSC_LINK == ''
         run: npm run dist:win
+
+      - name: Build signed Windows package
+        if: matrix.os == 'windows-latest' && (env.WIN_CSC_LINK != '' || env.CSC_LINK != '')
+        run: npm run dist:win:signed
 
       - name: Build macOS package
         if: matrix.os == 'macos-latest'
@@ -56,6 +67,9 @@ jobs:
             release/*.zip
             release/*.AppImage
             release/*.tar.gz
+            release/*.yml
+            release/*.yaml
+            release/*.blockmap
           if-no-files-found: error
 
       - name: Upload release assets
@@ -67,6 +81,9 @@ jobs:
             release/*.zip
             release/*.AppImage
             release/*.tar.gz
+            release/*.yml
+            release/*.yaml
+            release/*.blockmap
           draft: false
           prerelease: false
           generate_release_notes: true

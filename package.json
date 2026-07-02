@@ -1,6 +1,6 @@
 {
   "name": "tianyan-batch-ip-block-tool",
-  "version": "0.1.4",
+  "version": "0.1.5",
   "private": true,
   "description": "Local GUI tool for batch blocking IPs exported from Tianyan alerts.",
   "type": "module",
@@ -10,9 +10,10 @@
     "dev": "node src/server.js",
     "electron": "electron .",
     "dist": "electron-builder",
-    "dist:win": "electron-builder --win portable --publish never",
+    "dist:win": "electron-builder --win nsis portable --publish never",
     "dist:mac": "electron-builder --mac zip --publish never",
-    "dist:linux": "electron-builder --linux AppImage tar.gz --publish never"
+    "dist:linux": "electron-builder --linux AppImage tar.gz --publish never",
+    "dist:win:signed": "electron-builder --win nsis portable --publish never -c.win.signAndEditExecutable=true"
   },
   "engines": {
     "node": ">=18"
@@ -28,6 +29,7 @@
     "files": [
       "src/**/*",
       "public/**/*",
+      "build/icons/**/*",
       "config.example.json",
       "whitelist.txt",
       "package.json"
@@ -37,25 +39,56 @@
     },
     "win": {
       "target": [
+        "nsis",
         "portable"
       ],
-      "artifactName": "tianyan-batch-ip-block-tool-${version}-windows-${arch}-portable.${ext}",
+      "icon": "build/icons/icon.ico",
       "signAndEditExecutable": false
     },
     "mac": {
       "target": [
         "zip"
       ],
-      "artifactName": "tianyan-batch-ip-block-tool-${version}-mac-${arch}.${ext}",
-      "identity": null
+      "icon": "build/icons/icon.icns",
+      "hardenedRuntime": true,
+      "artifactName": "tianyan-batch-ip-block-tool-${version}-mac-${arch}.${ext}"
     },
     "linux": {
       "target": [
         "AppImage",
         "tar.gz"
       ],
+      "icon": "build/icons",
+      "category": "Utility",
       "artifactName": "tianyan-batch-ip-block-tool-${version}-linux-${arch}.${ext}"
+    },
+    "publish": [
+      {
+        "provider": "github",
+        "owner": "anjiajia",
+        "repo": "tianyan-batch-ip-block-tool",
+        "releaseType": "release"
+      }
+    ],
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "天眼批量封禁工具",
+      "artifactName": "tianyan-batch-ip-block-tool-${version}-windows-${arch}-setup.${ext}"
+    },
+    "portable": {
+      "artifactName": "tianyan-batch-ip-block-tool-${version}-windows-${arch}-portable.${ext}"
     }
   },
-  "author": "anjiajia <1334352581@qq.com>"
+  "author": "anjiajia <1334352581@qq.com>",
+  "dependencies": {
+    "electron-updater": "^6.8.9"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/anjiajia/tianyan-batch-ip-block-tool.git"
+  }
 }

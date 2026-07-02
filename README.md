@@ -52,3 +52,13 @@ Not executed directly yet:
 Dry-run is enabled by default. Keep it enabled until the parsed IP list and adapter configuration are confirmed.
 
 Runtime audit logs are written to `data/audit-log.jsonl` and ignored by git.
+
+## Release, signing, and auto update
+
+Tagged versions such as `v0.1.5` are built by GitHub Actions and uploaded to GitHub Releases. The desktop app uses GitHub Releases as the update source through `electron-updater`; packaged apps check for updates after startup.
+
+Code signing is optional until certificates are available:
+
+- Windows signing: add `WIN_CSC_LINK` and `WIN_CSC_KEY_PASSWORD` GitHub Secrets, or use `CSC_LINK` and `CSC_KEY_PASSWORD`.
+- macOS signing/notarization: add `CSC_LINK`, `CSC_KEY_PASSWORD`, `APPLE_ID`, `APPLE_APP_SPECIFIC_PASSWORD`, and `APPLE_TEAM_ID`.
+- If these secrets are absent, CI still builds unsigned packages.
