@@ -18,7 +18,7 @@ async function createWindow() {
     height: 880,
     minWidth: 1100,
     minHeight: 720,
-    title: "\u5929\u773c\u6279\u91cf\u5c01\u7981\u5de5\u5177",
+    title: "SOC\u6279\u91cf\u5c01\u7981\u5de5\u5177",
     icon: join(app.getAppPath(), "build", "icons", process.platform === "win32" ? "icon.ico" : "icon.png"),
     autoHideMenuBar: true,
     webPreferences: {

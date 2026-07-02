@@ -68,7 +68,7 @@ const FIREWALL_PRESETS = [
     successStatus: "200,201,204",
     tokenHeader: "Authorization",
     tokenPrefix: "Bearer ",
-    payload: { ip: "{{ip}}", expire: "{{ttl}}", reason: "{{reason}}", source: "tianyan-batch-tool" },
+    payload: { ip: "{{ip}}", expire: "{{ttl}}", reason: "{{reason}}", source: "soc-batch-tool" },
     advancedOpen: true,
   },
   {
@@ -382,7 +382,7 @@ function applyConfigToForm(config) {
   els.tokenPrefixInput.value = config.tokenPrefix ?? "Bearer ";
   els.ttlInput.value = Number(config.ttlSeconds || 86400);
   els.concurrencyInput.value = Number(config.concurrency || 3);
-  els.reasonInput.value = config.reason || "Tianyan batch block";
+  els.reasonInput.value = config.reason || "SOC batch block";
   els.ignoreTlsInput.checked = Boolean(config.ignoreTlsErrors ?? true);
   if (config.payload && typeof config.payload === "object") {
     els.payloadInput.value = JSON.stringify(config.payload, null, 2);

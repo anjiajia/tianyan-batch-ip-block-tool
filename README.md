@@ -1,6 +1,6 @@
-# Tianyan Batch IP Block Tool
+# SOC Batch IP Block Tool
 
-Local GUI tool for importing Tianyan alert exports, extracting IPs, filtering whitelist/duplicates, and batch blocking them on firewall devices.
+Local GUI tool for importing SOC alert exports, extracting IPs, filtering whitelist/duplicates, and batch blocking them on firewall devices.
 
 ## Start
 
@@ -55,7 +55,7 @@ Runtime audit logs are written to `data/audit-log.jsonl` and ignored by git.
 
 ## Release, signing, and auto update
 
-Tagged versions such as `v0.1.5` are built by GitHub Actions and uploaded to GitHub Releases. The desktop app uses GitHub Releases as the update source through `electron-updater`; packaged apps check for updates after startup.
+Tagged versions such as `v0.1.9` are built by GitHub Actions and uploaded to GitHub Releases. The desktop app uses GitHub Releases as the update source through `electron-updater`; packaged apps check for updates after startup.
 
 Code signing is optional until certificates are available:
 

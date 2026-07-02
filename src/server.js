@@ -57,7 +57,7 @@ createServer(async (req, res) => {
     return sendJson(res, { error: error.message || String(error) }, 500);
   }
 }).listen(port, "127.0.0.1", () => {
-  console.log(`Tianyan batch block tool is running: http://127.0.0.1:${port}`);
+  console.log(`SOC batch block tool is running: http://127.0.0.1:${port}`);
 });
 
 async function handleParse(req) {
@@ -99,7 +99,7 @@ async function handleFirewallOperation(req, action) {
   const ips = Array.isArray(body.ips) ? body.ips.map(String) : [];
   const config = normalizeBlockConfig(body.config || {});
   const ttl = Number(body.ttl || config.ttlSeconds || 86400);
-  const reason = String(body.reason || config.reason || "Tianyan batch block");
+  const reason = String(body.reason || config.reason || "SOC batch block");
   const dryRun = Boolean(body.dryRun);
   const concurrency = clamp(Number(body.concurrency || config.concurrency || 3), 1, 10);
 
@@ -263,7 +263,7 @@ async function blockSangfor(config, ip, ttl, reason) {
       url: `${baseUrl}/api/v1/namespaces/@namespace/whiteblacklist`,
       method: "POST",
       cookies,
-      json: { type: "BLACK", url: ip, enable: true, description: reason || "Tianyan batch block" },
+      json: { type: "BLACK", url: ip, enable: true, description: reason || "SOC batch block" },
       config,
     });
     const ok = add.status >= 200 && add.status < 300 && successText(add.text, add.json);
@@ -856,7 +856,7 @@ function normalizeBlockConfig(config) {
     successStatus: Array.isArray(config.successStatus) ? config.successStatus.map(Number) : [200, 201, 204],
     payload: config.payload && typeof config.payload === "object" ? config.payload : { ip: "{{ip}}", expire: "{{ttl}}", reason: "{{reason}}" },
     ttlSeconds: Number(config.ttlSeconds || 86400),
-    reason: String(config.reason || "Tianyan batch block"),
+    reason: String(config.reason || "SOC batch block"),
     concurrency: Number(config.concurrency || 3),
   };
 }

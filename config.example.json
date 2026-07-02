@@ -8,17 +8,21 @@
     "tokenPrefix": "Bearer ",
     "timeoutSeconds": 15,
     "ignoreTlsErrors": false,
-    "successStatus": [200, 201, 204],
+    "successStatus": [
+      200,
+      201,
+      204
+    ],
     "payload": {
       "ip": "{{ip}}",
       "expire": "{{ttl}}",
       "reason": "{{reason}}",
-      "source": "tianyan-batch-tool"
+      "source": "soc-batch-tool"
     }
   },
   "defaults": {
     "ttlSeconds": 86400,
-    "reason": "Tianyan batch block",
+    "reason": "SOC batch block",
     "concurrency": 3,
     "dryRun": true
   }
