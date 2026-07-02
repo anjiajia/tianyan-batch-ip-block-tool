@@ -144,8 +144,11 @@ Code signing is optional until certificates are available.
 
 Windows signing:
 
-- Add `WIN_CSC_LINK` and `WIN_CSC_KEY_PASSWORD` GitHub Secrets, or use `CSC_LINK` and `CSC_KEY_PASSWORD`.
-- Then use `npm run dist:win:signed` for signed Windows builds.
+- This repository is prepared for free open-source Windows signing through SignPath Foundation.
+- Apply at https://signpath.org/apply with the repository URL and the details in `docs/signpath-windows-application.md`.
+- The Windows CI build is defined in `.github/workflows/windows-release.yml` and produces unsigned NSIS and portable artifacts for SignPath review.
+- After SignPath approves the project, add their project-specific signing step to the workflow and publish the signed artifacts.
+- If using a traditional code signing certificate instead, add `WIN_CSC_LINK` and `WIN_CSC_KEY_PASSWORD` GitHub Secrets, or use `CSC_LINK` and `CSC_KEY_PASSWORD`, then run `npm run dist:win:signed`.
 
 macOS signing/notarization:
 

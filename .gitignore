@@ -4,4 +4,3 @@ data/*.jsonl
 .DS_Store
 .refs/
 release/
-package-lock.json
