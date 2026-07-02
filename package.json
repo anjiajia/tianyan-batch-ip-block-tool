@@ -1,6 +1,6 @@
 {
   "name": "tianyan-batch-ip-block-tool",
-  "version": "0.1.7",
+  "version": "0.1.8",
   "private": true,
   "description": "Local GUI tool for batch blocking IPs exported from Tianyan alerts.",
   "type": "module",

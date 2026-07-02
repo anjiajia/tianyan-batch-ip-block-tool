@@ -56,7 +56,7 @@ jobs:
             release/*.zip
             release/*.AppImage
             release/*.tar.gz
-            release/*.yml
+            release/latest*.yml
             release/*.yaml
             release/*.blockmap
           if-no-files-found: error
@@ -70,10 +70,11 @@ jobs:
             release/*.zip
             release/*.AppImage
             release/*.tar.gz
-            release/*.yml
+            release/latest*.yml
             release/*.yaml
             release/*.blockmap
           draft: false
           prerelease: false
           generate_release_notes: true
+
 
