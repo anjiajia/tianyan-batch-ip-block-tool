@@ -1,6 +1,6 @@
 {
   "name": "tianyan-batch-ip-block-tool",
-  "version": "0.1.9",
+  "version": "0.1.10",
   "private": true,
   "description": "Local GUI tool for importing SOC alert exports, extracting IPs, filtering whitelist/duplicates, and batch blocking them on firewall devices.",
   "type": "module",
