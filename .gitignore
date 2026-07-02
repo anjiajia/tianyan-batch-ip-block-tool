@@ -3,3 +3,5 @@ data/*.jsonl
 *.log
 .DS_Store
 .refs/
+release/
+package-lock.json

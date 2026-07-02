@@ -1,6 +1,6 @@
-﻿{
+{
   "name": "tianyan-batch-ip-block-tool",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "private": true,
   "description": "Local GUI tool for batch blocking IPs exported from Tianyan alerts.",
   "type": "module",
@@ -36,16 +36,34 @@
       "output": "release"
     },
     "win": {
-      "target": ["nsis", "portable"],
-      "artifactName": "${productName}-${version}-windows-${arch}.${ext}"
+      "target": [
+        "nsis",
+        "portable"
+      ],
+      "artifactName": "tianyan-batch-ip-block-tool-${version}-windows-${arch}.${ext}",
+      "signAndEditExecutable": false
     },
     "mac": {
-      "target": ["dmg", "zip"],
-      "artifactName": "${productName}-${version}-mac-${arch}.${ext}"
+      "target": [
+        "dmg",
+        "zip"
+      ],
+      "artifactName": "tianyan-batch-ip-block-tool-${version}-mac-${arch}.${ext}"
     },
     "linux": {
-      "target": ["AppImage", "deb", "tar.gz"],
-      "artifactName": "${productName}-${version}-linux-${arch}.${ext}"
+      "target": [
+        "AppImage",
+        "deb",
+        "tar.gz"
+      ],
+      "artifactName": "tianyan-batch-ip-block-tool-${version}-linux-${arch}.${ext}"
+    },
+    "nsis": {
+      "artifactName": "tianyan-batch-ip-block-tool-${version}-windows-${arch}-setup.${ext}"
+    },
+    "portable": {
+      "artifactName": "tianyan-batch-ip-block-tool-${version}-windows-${arch}-portable.${ext}"
     }
-  }
+  },
+  "author": "anjiajia <1334352581@qq.com>"
 }
