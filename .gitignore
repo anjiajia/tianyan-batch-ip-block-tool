@@ -1,0 +1,5 @@
+node_modules/
+data/*.jsonl
+*.log
+.DS_Store
+.refs/

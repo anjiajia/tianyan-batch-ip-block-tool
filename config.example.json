@@ -1,0 +1,25 @@
+{
+  "firewall": {
+    "name": "Qianxin Firewall",
+    "endpoint": "https://firewall.example.com/api/v1/ip/blacklist/add",
+    "method": "POST",
+    "token": "CHANGE_ME",
+    "tokenHeader": "Authorization",
+    "tokenPrefix": "Bearer ",
+    "timeoutSeconds": 15,
+    "ignoreTlsErrors": false,
+    "successStatus": [200, 201, 204],
+    "payload": {
+      "ip": "{{ip}}",
+      "expire": "{{ttl}}",
+      "reason": "{{reason}}",
+      "source": "tianyan-batch-tool"
+    }
+  },
+  "defaults": {
+    "ttlSeconds": 86400,
+    "reason": "Tianyan batch block",
+    "concurrency": 3,
+    "dryRun": true
+  }
+}

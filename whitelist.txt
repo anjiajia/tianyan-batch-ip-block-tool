@@ -1,0 +1,5 @@
+# One IP or CIDR per line.
+# Examples:
+# 10.0.0.0/8
+# 127.0.0.1
+# 192.168.1.10

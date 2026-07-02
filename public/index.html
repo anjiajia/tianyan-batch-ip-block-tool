@@ -1,0 +1,202 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>&#22825;&#30524;&#25209;&#37327;&#23553;&#31105;&#24037;&#20855;</title>
+    <link rel="stylesheet" href="/styles.css">
+  </head>
+  <body>
+    <header class="app-header">
+      <div>
+        <h1>&#22825;&#30524;&#25209;&#37327;&#23553;&#31105;&#24037;&#20855;</h1>
+        <p>&#23548;&#20837;&#21578;&#35686;&#25991;&#20214;&#65292;&#31579;&#36873; IP&#65292;&#30830;&#35748;&#21518;&#25209;&#37327;&#20889;&#20837;&#38450;&#28779;&#22681;&#40657;&#21517;&#21333;&#12290;</p>
+      </div>
+      <div class="status-pill" id="serverStatus">&#26412;&#22320;&#36816;&#34892;</div>
+    </header>
+
+    <main class="layout">
+      <section class="panel input-panel">
+        <div class="panel-title">
+          <h2>&#23548;&#20837;&#19982;&#31579;&#36873;</h2>
+          <span id="fileSummary">&#26410;&#23548;&#20837;&#25991;&#20214;</span>
+        </div>
+
+        <label class="drop-zone" for="fileInput" id="dropZone">
+          <input id="fileInput" type="file" accept=".csv,.txt,.xlsx">
+          <span class="drop-icon">+</span>
+          <strong>&#36873;&#25321;&#22825;&#30524;&#23548;&#20986;&#25991;&#20214;</strong>
+          <small>&#25903;&#25345; CSV&#12289;TXT&#12289;XLSX&#65307;&#20063;&#21487;&#20197;&#25226;&#25991;&#20214;&#25302;&#21040;&#36825;&#37324;</small>
+        </label>
+
+        <div class="field-grid">
+          <label>
+            <span>&#30333;&#21517;&#21333;</span>
+            <textarea id="whitelistInput" spellcheck="false" rows="7">10.0.0.0/8
+172.16.0.0/12
+192.168.0.0/16
+127.0.0.1</textarea>
+          </label>
+          <label>
+            <span>&#25163;&#21160;&#34917;&#20805; IP</span>
+            <textarea id="manualInput" spellcheck="false" rows="7" placeholder="&#27599;&#34892;&#19968;&#20010; IP&#65292;&#25110;&#30452;&#25509;&#31896;&#36148;&#21253;&#21547; IP &#30340;&#25991;&#26412;"></textarea>
+          </label>
+        </div>
+
+        <div class="toolbar">
+          <button class="primary" id="parseButton">&#35299;&#26512;&#25991;&#20214;</button>
+          <button id="addManualButton">&#21152;&#20837;&#25163;&#21160; IP</button>
+          <button id="clearButton">&#28165;&#31354;</button>
+        </div>
+
+        <div class="stats">
+          <div><strong id="statTotal">0</strong><span>&#21457;&#29616; IP</span></div>
+          <div><strong id="statReady">0</strong><span>&#24453;&#23553;&#31105;</span></div>
+          <div><strong id="statSkipped">0</strong><span>&#24050;&#36807;&#28388;</span></div>
+          <div><strong id="statSelected">0</strong><span>&#24050;&#36873;&#25321;</span></div>
+        </div>
+
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th><input id="selectAll" type="checkbox" checked></th>
+                <th>IP</th>
+                <th>&#29366;&#24577;</th>
+                <th>&#26469;&#28304;</th>
+              </tr>
+            </thead>
+            <tbody id="candidateBody">
+              <tr><td colspan="4" class="empty">&#23548;&#20837;&#25991;&#20214;&#21518;&#20250;&#22312;&#36825;&#37324;&#39044;&#35272;&#12290;</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <aside class="panel config-panel">
+        <div class="panel-title">
+          <h2>&#38450;&#28779;&#22681;&#37197;&#32622;</h2>
+          <button id="loadExampleButton">&#36890;&#29992;&#27169;&#26495;</button>
+        </div>
+
+        <label>
+          <span>&#38450;&#28779;&#22681;&#31867;&#22411; / SecAutoBan &#36866;&#37197;&#22120;</span>
+          <select id="firewallPresetInput"></select>
+        </label>
+        <div class="preset-note" id="presetNote">&#36873;&#25321;&#27169;&#26495;&#21518;&#20250;&#33258;&#21160;&#22635;&#20837;&#23545;&#24212;&#37197;&#32622;&#12290;</div>
+
+        <label>
+          <span>Base URL</span>
+          <input id="baseUrlInput" placeholder="https://firewall.example.com:8443">
+        </label>
+
+        <div class="two-col">
+          <label>
+            <span>Username / API Key</span>
+            <input id="usernameInput" placeholder="api-admin">
+          </label>
+          <label>
+            <span>Password / API Secret</span>
+            <input id="passwordInput" type="password" placeholder="password or secret">
+          </label>
+        </div>
+
+        <div class="two-col">
+          <label>
+            <span>Object Name</span>
+            <input id="objectNameInput" placeholder="alias/group/list name">
+          </label>
+          <label>
+            <span>PwdLen / Extra</span>
+            <input id="pwdLenInput" type="number" min="0" value="0">
+          </label>
+        </div>
+
+        <details class="advanced-config" open>
+          <summary>&#36890;&#29992; HTTP &#20860;&#23481;&#37197;&#32622;</summary>
+          <label>
+            <span>Endpoint</span>
+            <input id="endpointInput" placeholder="https://firewall.example.com/api/block/{{ip}}">
+          </label>
+          <div class="two-col">
+            <label>
+              <span>Method</span>
+              <select id="methodInput">
+                <option>POST</option>
+                <option>PUT</option>
+                <option>PATCH</option>
+                <option>GET</option>
+                <option>DELETE</option>
+              </select>
+            </label>
+            <label>
+              <span>&#25104;&#21151;&#29366;&#24577;&#30721;</span>
+              <input id="successInput" value="200,201,204">
+            </label>
+          </div>
+          <label>
+            <span>Token / Header Key</span>
+            <input id="tokenInput" type="password" placeholder="Bearer token, API key, SID">
+          </label>
+          <div class="two-col">
+            <label>
+              <span>Token Header</span>
+              <input id="tokenHeaderInput" value="Authorization">
+            </label>
+            <label>
+              <span>Token Prefix</span>
+              <input id="tokenPrefixInput" value="Bearer ">
+            </label>
+          </div>
+          <label>
+            <span>Payload JSON &#27169;&#26495;</span>
+            <textarea id="payloadInput" spellcheck="false" rows="7">{
+  "ip": "{{ip}}",
+  "expire": "{{ttl}}",
+  "reason": "{{reason}}"
+}</textarea>
+          </label>
+        </details>
+
+        <div class="two-col">
+          <label>
+            <span>TTL &#31186;</span>
+            <input id="ttlInput" type="number" min="60" value="86400">
+          </label>
+          <label>
+            <span>&#24182;&#21457;</span>
+            <input id="concurrencyInput" type="number" min="1" max="10" value="3">
+          </label>
+        </div>
+
+        <label>
+          <span>&#23553;&#31105;&#21407;&#22240;</span>
+          <input id="reasonInput" value="Tianyan batch block">
+        </label>
+
+        <div class="switches">
+          <label class="check-row">
+            <input id="dryRunInput" type="checkbox" checked>
+            <span>Dry-run &#35797;&#36305;&#65292;&#19981;&#30495;&#27491;&#35843;&#29992;&#38450;&#28779;&#22681;</span>
+          </label>
+          <label class="check-row">
+            <input id="ignoreTlsInput" type="checkbox" checked>
+            <span>&#24573;&#30053; HTTPS &#35777;&#20070;&#38169;&#35823;</span>
+          </label>
+        </div>
+
+        <button class="danger" id="runButton">&#25191;&#34892;&#25209;&#37327;&#23553;&#31105;</button>
+      </aside>
+    </main>
+
+    <section class="panel result-panel">
+      <div class="panel-title">
+        <h2>&#25191;&#34892;&#32467;&#26524;</h2>
+        <button id="downloadButton" disabled>&#19979;&#36733; CSV</button>
+      </div>
+      <pre id="logOutput">&#31561;&#24453;&#25805;&#20316;&#12290;</pre>
+    </section>
+
+    <script src="/app.js" type="module"></script>
+  </body>
+</html>
