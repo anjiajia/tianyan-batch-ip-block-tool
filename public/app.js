@@ -99,7 +99,7 @@ const FIREWALL_PRESETS = [
 
 const CONFIG_STORAGE_KEY = "tianyanBatchIpBlockTool.config.v1";
 
-const state = { file: null, candidates: [], results: [] };
+const state = { file: null, candidates: [], results: [], audits: [] };
 
 const els = {
   fileInput: document.querySelector("#fileInput"),
@@ -141,12 +141,17 @@ const els = {
   clearConfigButton: document.querySelector("#clearConfigButton"),
   saveSecretsInput: document.querySelector("#saveSecretsInput"),
   runButton: document.querySelector("#runButton"),
+  unblockButton: document.querySelector("#unblockButton"),
   downloadButton: document.querySelector("#downloadButton"),
+  refreshAuditButton: document.querySelector("#refreshAuditButton"),
+  auditSummary: document.querySelector("#auditSummary"),
+  auditBody: document.querySelector("#auditBody"),
   logOutput: document.querySelector("#logOutput"),
   advancedConfig: document.querySelector(".advanced-config"),
 };
 
 initPresets();
+loadAudit();
 
 els.fileInput.addEventListener("change", () => { state.file = els.fileInput.files?.[0] || null; updateFileSummary(); });
 ["dragenter", "dragover"].forEach((name) => els.dropZone.addEventListener(name, (event) => { event.preventDefault(); els.dropZone.classList.add("dragover"); }));
@@ -162,7 +167,9 @@ els.saveConfigButton.addEventListener("click", saveConfig);
 els.loadConfigButton.addEventListener("click", () => loadSavedConfig({ silent: false }));
 els.clearConfigButton.addEventListener("click", clearSavedConfig);
 els.runButton.addEventListener("click", runBlock);
+els.unblockButton.addEventListener("click", runUnblock);
 els.downloadButton.addEventListener("click", downloadResults);
+els.refreshAuditButton.addEventListener("click", loadAudit);
 
 function initPresets() {
   els.firewallPresetInput.innerHTML = "";
@@ -287,8 +294,17 @@ function updateStats() {
 }
 
 async function runBlock() {
+  return runFirewallAction("block");
+}
+
+async function runUnblock() {
+  return runFirewallAction("unblock");
+}
+
+async function runFirewallAction(action) {
   const ips = selectedIps();
-  if (ips.length === 0) return log("No selected IPs to block.");
+  const actionLabel = action === "block" ? "\u5c01\u7981" : "\u89e3\u5c01";
+  if (ips.length === 0) return log(`\u6ca1\u6709\u9009\u4e2d\u9700\u8981${actionLabel}\u7684 IP\u3002`);
   const preset = FIREWALL_PRESETS.find((item) => item.id === els.firewallPresetInput.value);
   if (preset?.id.endsWith("-note")) return log("This adapter needs a sidecar/helper and is not executable in the GUI yet.");
 
@@ -296,29 +312,31 @@ async function runBlock() {
   try { payload = JSON.parse(els.payloadInput.value || "{}"); } catch (error) { return log(`Payload JSON is invalid: ${error.message}`); }
 
   const config = readConfigFromForm(payload);
-
   const dryRun = els.dryRunInput.checked;
-  const confirmText = dryRun ? `模拟执行 ${ips.length} 个 IP，不会调用防火墙 API。` : `确认使用 ${currentPresetLabel(config.vendor)} 封禁 ${ips.length} 个 IP？`;
+  const endpoint = action === "block" ? "/api/block" : "/api/unblock";
+  const confirmText = dryRun
+    ? `\u6a21\u62df\u6267\u884c${actionLabel} ${ips.length} \u4e2a IP\uff0c\u4e0d\u4f1a\u8c03\u7528\u9632\u706b\u5899 API\u3002`
+    : `\u786e\u8ba4\u4f7f\u7528 ${currentPresetLabel(config.vendor)} ${actionLabel} ${ips.length} \u4e2a IP\uff1f`;
   if (!window.confirm(confirmText)) return;
 
-  setBusy(true, dryRun ? "正在模拟执行..." : "正在调用防火墙适配器...");
+  setBusy(true, dryRun ? `\u6b63\u5728\u6a21\u62df${actionLabel}...` : `\u6b63\u5728\u8c03\u7528\u9632\u706b\u5899\u9002\u914d\u5668${actionLabel}...`);
   try {
-    const response = await postJson("/api/block", { ips, config, ttl: Number(els.ttlInput.value), reason: els.reasonInput.value, dryRun, concurrency: Number(els.concurrencyInput.value) });
+    const response = await postJson(endpoint, { ips, config, ttl: Number(els.ttlInput.value), reason: els.reasonInput.value, dryRun, concurrency: Number(els.concurrencyInput.value) });
     state.results = response.results;
     els.downloadButton.disabled = state.results.length === 0;
     const success = state.results.filter((item) => item.ok).length;
     const failed = state.results.length - success;
     const title = dryRun
-      ? `模拟执行完成：模拟 ${state.results.length} 条，防火墙调用 0 次`
-      : `Done: success=${success}, failed=${failed}`;
+      ? `\u6a21\u62df${actionLabel}\u5b8c\u6210\uff1a\u6a21\u62df ${state.results.length} \u6761\uff0c\u9632\u706b\u5899\u8c03\u7528 0 \u6b21`
+      : `${actionLabel}\u5b8c\u6210\uff1a\u6210\u529f ${success}\uff0c\u5931\u8d25 ${failed}`;
     log([title, "", ...state.results.map(formatResultLine)].join("\n"));
+    await loadAudit({ silent: true });
   } catch (error) {
-    log(`Run failed: ${error.message}`);
+    log(`${actionLabel}\u5931\u8d25\uff1a${error.message}`);
   } finally {
     setBusy(false);
   }
 }
-
 function readConfigFromForm(payloadOverride) {
   const payload = payloadOverride ?? JSON.parse(els.payloadInput.value || "{}");
   return {
@@ -416,11 +434,71 @@ function clearSavedConfig() {
   log("已清除本机保存的配置。");
 }
 
+async function loadAudit({ silent = false } = {}) {
+  try {
+    const response = await fetch("/api/audit?limit=100");
+    const payload = await response.json();
+    if (!response.ok) throw new Error(payload.error || response.statusText);
+    state.audits = payload.entries || [];
+    renderAudit();
+    if (!silent) log(`已刷新审计记录：${state.audits.length} 条。`);
+  } catch (error) {
+    if (!silent) log(`审计记录加载失败：${error.message}`);
+  }
+}
+
+function renderAudit() {
+  els.auditSummary.textContent = `最近 ${state.audits.length} 条操作记录`;
+  if (state.audits.length === 0) {
+    els.auditBody.innerHTML = '<tr><td colspan="6" class="empty">暂无审计记录。</td></tr>';
+    return;
+  }
+  els.auditBody.innerHTML = state.audits.map((entry, index) => {
+    const results = Array.isArray(entry.results) ? entry.results : [];
+    const ips = results.map((item) => item.ip).filter(Boolean);
+    const action = entry.action === "unblock" ? "解封" : "封禁";
+    const dryRun = entry.dryRun ? " / 模拟" : "";
+    const success = Number(entry.success || 0);
+    const failed = Number(entry.failed || 0);
+    const ipText = ips.slice(0, 6).join(", ") + (ips.length > 6 ? ` 等 ${ips.length} 个` : "");
+    return `<tr>
+      <td>${escapeHtml(formatDateTime(entry.startedAt || entry.finishedAt))}</td>
+      <td>${escapeHtml(action + dryRun)}</td>
+      <td>${escapeHtml(entry.adapter || "-")}</td>
+      <td>${escapeHtml(`成功 ${success} / 失败 ${failed}`)}</td>
+      <td>${escapeHtml(ipText || "-")}</td>
+      <td><button class="small-button" data-audit-index="${index}">回填 IP</button></td>
+    </tr>`;
+  }).join("");
+  document.querySelectorAll("[data-audit-index]").forEach((button) => button.addEventListener("click", () => {
+    const entry = state.audits[Number(button.dataset.auditIndex)];
+    addAuditIpsToCandidates(entry);
+  }));
+}
+
+function addAuditIpsToCandidates(entry) {
+  const results = Array.isArray(entry?.results) ? entry.results : [];
+  const existing = new Set(state.candidates.map((candidate) => candidate.ip));
+  const additions = results
+    .map((item) => item.ip)
+    .filter(Boolean)
+    .filter((ip, index, list) => list.indexOf(ip) === index)
+    .map((ip, index) => {
+      const duplicate = existing.has(ip);
+      existing.add(ip);
+      return { id: `audit-${Date.now()}-${index}`, ip, row: "-", source: "audit record", skip: duplicate, flags: duplicate ? ["duplicate"] : [], selected: !duplicate };
+    });
+  state.candidates.push(...additions);
+  renderCandidates();
+  log(`已从审计记录回填 ${additions.length} 个 IP。`);
+}
+
 function formatResultLine(item) {
   if (item.dryRun || item.status === "DRY_RUN") {
     return `[模拟] ${item.ip} (${item.adapter || "adapter"}) -> 仅模拟，未调用防火墙 API。`;
   }
-  return `[${item.ok ? "OK" : "FAIL"}] ${item.ip} (${item.adapter || "adapter"}) -> ${item.status} ${item.response}`;
+  const action = item.action === "unblock" ? "解封" : "封禁";
+  return `[${item.ok ? "OK" : "FAIL"}] ${action} ${item.ip} (${item.adapter || "adapter"}) -> ${item.status} ${item.response}`;
 }
 
 function currentPresetLabel(fallback) {
@@ -431,8 +509,8 @@ function currentPresetLabel(fallback) {
 function selectedIps() { return [...new Set(state.candidates.filter((item) => item.selected && !item.skip).map((item) => item.ip))]; }
 
 function downloadResults() {
-  const rows = [["ip", "adapter", "ok", "status", "response", "dry_run", "time"]];
-  state.results.forEach((item) => rows.push([item.ip, item.adapter, item.ok, item.status, item.response, item.dryRun, item.time]));
+  const rows = [["action", "ip", "adapter", "ok", "status", "response", "dry_run", "time"]];
+  state.results.forEach((item) => rows.push([item.action, item.ip, item.adapter, item.ok, item.status, item.response, item.dryRun, item.time]));
   const csv = rows.map((row) => row.map(csvCell).join(",")).join("\r\n");
   const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
   const url = URL.createObjectURL(blob);
@@ -443,13 +521,14 @@ function downloadResults() {
   URL.revokeObjectURL(url);
 }
 
-function setBusy(busy, message) { [els.parseButton, els.addManualButton, els.runButton].forEach((button) => { button.disabled = busy; }); if (message) log(message); }
+function setBusy(busy, message) { [els.parseButton, els.addManualButton, els.runButton, els.unblockButton, els.refreshAuditButton].forEach((button) => { button.disabled = busy; }); if (message) log(message); }
 function log(message) { els.logOutput.textContent = message; }
 async function postJson(url, body) { const response = await fetch(url, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) }); const payload = await response.json(); if (!response.ok) throw new Error(payload.error || response.statusText); return payload; }
 function fileToBase64(file) { return new Promise((resolve, reject) => { const reader = new FileReader(); reader.onload = () => resolve(String(reader.result).split(",")[1] || ""); reader.onerror = () => reject(reader.error); reader.readAsDataURL(file); }); }
 function stringToBase64(value) { const bytes = new TextEncoder().encode(value); let binary = ""; bytes.forEach((byte) => { binary += String.fromCharCode(byte); }); return btoa(binary); }
 function extractIps(text) { return [...new Set(String(text).match(/\b(?:25[0-5]|2[0-4]\d|1?\d?\d)(?:\.(?:25[0-5]|2[0-4]\d|1?\d?\d)){3}\b/g) || [])]; }
 function formatSize(bytes) { if (bytes < 1024) return `${bytes} B`; if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`; return `${(bytes / 1024 / 1024).toFixed(1)} MB`; }
+function formatDateTime(value) { return value ? new Date(value).toLocaleString("zh-CN", { hour12: false }) : "-"; }
 function tag(text, type) { return `<span class="tag ${type}">${escapeHtml(text)}</span>`; }
 function csvCell(value) { const text = String(value ?? ""); return /[",\r\n]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text; }
 function decodeHtml(value) { const textarea = document.createElement("textarea"); textarea.innerHTML = String(value); return textarea.value; }

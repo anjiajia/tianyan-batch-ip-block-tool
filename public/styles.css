@@ -222,6 +222,18 @@ button:disabled {
   background: var(--danger-strong);
 }
 
+.secondary-danger {
+  width: 100%;
+  margin-top: 10px;
+  border-color: #d7a1a1;
+  background: #fff5f5;
+  color: var(--danger);
+}
+
+.secondary-danger:hover {
+  background: #ffe8e8;
+}
+
 .toolbar {
   display: flex;
   gap: 10px;
@@ -350,8 +362,45 @@ td:nth-child(3) {
   height: 18px;
 }
 
-.result-panel {
+.result-panel,
+.audit-panel {
   margin: 0 32px 32px;
+}
+
+.audit-panel {
+  margin-top: -14px;
+}
+
+.audit-table-wrap {
+  max-height: 360px;
+}
+
+.audit-table th:first-child,
+.audit-table td:first-child {
+  width: 190px;
+}
+
+.audit-table th:nth-child(2),
+.audit-table td:nth-child(2) {
+  width: 88px;
+  font-family: inherit;
+}
+
+.audit-table th:nth-child(4),
+.audit-table td:nth-child(4) {
+  width: 128px;
+}
+
+.audit-table th:nth-child(5),
+.audit-table td:nth-child(5) {
+  width: auto;
+  font-family: Consolas, "Courier New", monospace;
+}
+
+.audit-table th:last-child,
+.audit-table td:last-child {
+  width: 112px;
+  text-align: right;
 }
 
 pre {
@@ -373,7 +422,8 @@ pre {
 @media (max-width: 980px) {
   .app-header,
   .layout,
-  .result-panel {
+  .result-panel,
+  .audit-panel {
     margin: 0;
     padding-left: 16px;
     padding-right: 16px;

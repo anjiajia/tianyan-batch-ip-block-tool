@@ -1,5 +1,5 @@
 import { createServer } from "node:http";
-import { appendFile, mkdir } from "node:fs/promises";
+import { appendFile, mkdir, readFile } from "node:fs/promises";
 import { existsSync, createReadStream } from "node:fs";
 import { dirname, extname, join, resolve } from "node:path";
 import { inflateRawSync } from "node:zlib";
@@ -33,6 +33,14 @@ createServer(async (req, res) => {
 
     if (req.method === "POST" && url.pathname === "/api/block") {
       return sendJson(res, await handleBlock(req));
+    }
+
+    if (req.method === "POST" && url.pathname === "/api/unblock") {
+      return sendJson(res, await handleUnblock(req));
+    }
+
+    if (req.method === "GET" && url.pathname === "/api/audit") {
+      return sendJson(res, await handleAudit(url));
     }
 
     if (req.method === "GET" && url.pathname === "/api/config-example") {
@@ -79,6 +87,14 @@ async function handleParse(req) {
 }
 
 async function handleBlock(req) {
+  return handleFirewallOperation(req, "block");
+}
+
+async function handleUnblock(req) {
+  return handleFirewallOperation(req, "unblock");
+}
+
+async function handleFirewallOperation(req, action) {
   const body = await readJson(req);
   const ips = Array.isArray(body.ips) ? body.ips.map(String) : [];
   const config = normalizeBlockConfig(body.config || {});
@@ -89,13 +105,17 @@ async function handleBlock(req) {
 
   const startedAt = new Date().toISOString();
   const adapter = getAdapter(config.vendor);
+  if (typeof adapter[action] !== "function") {
+    throw new Error(`${adapter.name} does not support ${action}.`);
+  }
   const results = await runPool(ips, concurrency, async (ip) => {
     const result = dryRun
-      ? { ok: true, status: "DRY_RUN", response: `模拟执行：${adapter.name} 未调用防火墙 API。` }
-      : await adapter.block(config, ip, ttl, reason);
+      ? { ok: true, status: "DRY_RUN", response: `${action} dry-run: ${adapter.name} skipped firewall API call.` }
+      : await adapter[action](config, ip, ttl, reason);
     return {
       ip,
       adapter: adapter.name,
+      action,
       ok: result.ok,
       status: result.status,
       response: result.response,
@@ -105,6 +125,7 @@ async function handleBlock(req) {
   });
 
   await appendAudit({
+    action,
     startedAt,
     finishedAt: new Date().toISOString(),
     adapter: adapter.name,
@@ -123,13 +144,13 @@ async function handleBlock(req) {
 
 function getAdapter(vendor) {
   const adapters = {
-    "qianxin-secaegis": { name: "奇安信防火墙", block: blockQianxin },
-    "topsec-secaegis": { name: "天融信防火墙", block: blockTopsec },
-    "sangfor-secaegis": { name: "深信服防火墙", block: blockSangfor },
-    "opnsense-secaegis": { name: "OPNsense 别名 API", block: blockOpnsense },
-    "checkpoint-secaegis": { name: "Check Point 管理 API", block: blockCheckPoint },
+    "qianxin-secaegis": { name: "奇安信防火墙", block: blockQianxin, unblock: unblockQianxin },
+    "topsec-secaegis": { name: "天融信防火墙", block: blockTopsec, unblock: unblockTopsec },
+    "sangfor-secaegis": { name: "深信服防火墙", block: blockSangfor, unblock: unblockSangfor },
+    "opnsense-secaegis": { name: "OPNsense 别名 API", block: blockOpnsense, unblock: unblockOpnsense },
+    "checkpoint-secaegis": { name: "Check Point 管理 API", block: blockCheckPoint, unblock: unblockCheckPoint },
   };
-  return adapters[vendor] || { name: "通用 HTTP", block: blockGenericHttp };
+  return adapters[vendor] || { name: "通用 HTTP", block: blockGenericHttp, unblock: unblockGenericHttp };
 }
 
 async function blockQianxin(config, ip) {
@@ -159,6 +180,44 @@ async function blockQianxin(config, ip) {
     });
     const ok = add.status === 200 && add.json?.head?.error_code === 0;
     return { ok, status: add.status, response: add.text.slice(0, 1000) };
+  } finally {
+    await requestJson({
+      url: `${baseUrl}/v1.0/out/`,
+      method: "POST",
+      cookies,
+      json: { username: config.username },
+      config,
+    }).catch(() => null);
+  }
+}
+
+async function unblockQianxin(config, ip) {
+  const baseUrl = requireBaseUrl(config);
+  const login = await requestJson({
+    url: `${baseUrl}/v1.0/login/`,
+    method: "POST",
+    json: { username: config.username, password: config.password },
+    config,
+  });
+  const cookies = mergeCookies(login.cookies, { token: login.json?.result?.token });
+  if (!cookies.token) return { ok: false, status: login.status, response: "Login did not return result.token" };
+
+  try {
+    const exists = await qianxinExists(config, cookies, ip);
+    if (!exists) return { ok: true, status: "NOT_FOUND", response: "IP is not in blacklist." };
+
+    const remove = await requestJson({
+      url: `${baseUrl}/v1.0/rest/`,
+      method: "POST",
+      cookies,
+      json: [{
+        head: { function: "delete_batch_blacklist", module: "addr_blacklist" },
+        body: { addr_blacklist_cp: { batch_blacklist_list: [{ ip }] } },
+      }],
+      config,
+    });
+    const ok = remove.status === 200 && (remove.json?.head?.error_code === 0 || successText(remove.text, remove.json));
+    return { ok, status: remove.status, response: remove.text.slice(0, 1000) };
   } finally {
     await requestJson({
       url: `${baseUrl}/v1.0/out/`,
@@ -209,6 +268,40 @@ async function blockSangfor(config, ip, ttl, reason) {
     });
     const ok = add.status >= 200 && add.status < 300 && successText(add.text, add.json);
     return { ok, status: add.status, response: add.text.slice(0, 1000) };
+  } finally {
+    await requestJson({
+      url: `${baseUrl}/api/v1/namespaces/@namespace/logout`,
+      method: "POST",
+      json: { loginResult: { token } },
+      config,
+    }).catch(() => null);
+  }
+}
+
+async function unblockSangfor(config, ip) {
+  const baseUrl = requireBaseUrl(config);
+  const login = await requestJson({
+    url: `${baseUrl}/api/v1/namespaces/@namespace/login`,
+    method: "POST",
+    json: { name: config.username, password: config.password },
+    config,
+  });
+  const token = login.json?.data?.loginResult?.token;
+  if (!token) return { ok: false, status: login.status, response: "Login did not return data.loginResult.token" };
+  const cookies = { token };
+
+  try {
+    const exists = await sangforExists(config, cookies, ip);
+    if (!exists) return { ok: true, status: "NOT_FOUND", response: "IP is not in blacklist." };
+
+    const remove = await requestJson({
+      url: `${baseUrl}/api/v1/namespaces/@namespace/whiteblacklist/${encodeURIComponent(ip)}`,
+      method: "DELETE",
+      cookies,
+      config,
+    });
+    const ok = remove.status >= 200 && remove.status < 300 && successText(remove.text, remove.json);
+    return { ok, status: remove.status, response: remove.text.slice(0, 1000) };
   } finally {
     await requestJson({
       url: `${baseUrl}/api/v1/namespaces/@namespace/logout`,
@@ -282,6 +375,50 @@ async function blockTopsec(config, ip) {
   }
 }
 
+async function unblockTopsec(config, ip) {
+  const baseUrl = requireBaseUrl(config);
+  const login = await requestText({
+    url: `${baseUrl}/home/login/`,
+    method: "POST",
+    form: { name: config.username, password: config.password, pwdlen: String(config.pwdLen || config.password?.length || 6) },
+    config,
+  });
+  const parsed = parseTopsecToken(login.text);
+  if (!parsed.token || !parsed.authid) return { ok: false, status: login.status, response: "Login did not return token/authid" };
+
+  let token = parsed.token;
+  const userMark = parsed.authid;
+  const headers = { Referer: `${baseUrl}/html/webui/home.html?userMark=${encodeURIComponent(userMark)}` };
+  try {
+    const exists = await topsecExists(config, userMark, token, headers, ip);
+    token = exists.token || token;
+    if (!exists.exists) return { ok: true, status: "NOT_FOUND", response: "IP is not in blacklist." };
+
+    const remove = await requestText({
+      url: `${baseUrl}/home/default/blackListSpread/del/?userMark=${encodeURIComponent(userMark)}`,
+      method: "POST",
+      headers,
+      form: {
+        sip: ip,
+        "@change": "true",
+        "commands[0][pf_blacklist_del][sip]": ip,
+        token,
+      },
+      config,
+    });
+    const removeParsed = parseTopsecToken(remove.text);
+    const ok = remove.status === 200 && /true/i.test(removeParsed.data || remove.text);
+    return { ok, status: remove.status, response: remove.text.slice(0, 1000) };
+  } finally {
+    await requestText({
+      url: `${baseUrl}/home/index/logout/?userMark=${encodeURIComponent(userMark)}&token=${encodeURIComponent(token)}`,
+      method: "GET",
+      headers,
+      config,
+    }).catch(() => null);
+  }
+}
+
 async function topsecExists(config, userMark, token, headers, ip) {
   const url = `${requireBaseUrl(config)}/home/default/blackListSpread/searchpf/?userMark=${encodeURIComponent(userMark)}&page=1&rows=30&search=${encodeURIComponent(ip)}&%40change=true&commands%5B0%5D%5Bpf_blacklist_static_search%5D%5B0%5D=${encodeURIComponent(ip)}&token=${encodeURIComponent(token)}`;
   const check = await requestText({ url, method: "GET", headers, config });
@@ -335,6 +472,33 @@ async function blockOpnsense(config, ip) {
   return { ok, status: add.status, response: add.text.slice(0, 1000) };
 }
 
+async function unblockOpnsense(config, ip) {
+  const baseUrl = requireBaseUrl(config);
+  const aliasName = requireObjectName(config, "alias_name");
+  const auth = basicAuth(config.username || config.apiKey, config.apiSecret || config.password);
+
+  const list = await requestJson({
+    url: `${baseUrl}/api/firewall/alias_util/list/${encodeURIComponent(aliasName)}`,
+    method: "GET",
+    headers: { Authorization: auth },
+    config,
+  });
+  const rows = Array.isArray(list.json?.rows) ? list.json.rows : [];
+  if (!rows.some((row) => row.ip === ip || row.address === ip)) {
+    return { ok: true, status: "NOT_FOUND", response: "IP is not in alias." };
+  }
+
+  const remove = await requestJson({
+    url: `${baseUrl}/api/firewall/alias_util/delete/${encodeURIComponent(aliasName)}`,
+    method: "POST",
+    headers: { Authorization: auth },
+    json: { address: ip },
+    config,
+  });
+  const ok = remove.status === 200 && (remove.json?.status === "done" || successText(remove.text, remove.json));
+  return { ok, status: remove.status, response: remove.text.slice(0, 1000) };
+}
+
 async function blockCheckPoint(config, ip) {
   const baseUrl = requireBaseUrl(config);
   const groupName = requireObjectName(config, "group_name");
@@ -379,6 +543,38 @@ async function blockCheckPoint(config, ip) {
   }
 }
 
+async function unblockCheckPoint(config, ip) {
+  const baseUrl = requireBaseUrl(config);
+  const groupName = requireObjectName(config, "group_name");
+  const login = await requestJson({
+    url: `${baseUrl}/web_api/login`,
+    method: "POST",
+    json: { user: config.username, password: config.password },
+    config,
+  });
+  const sid = login.json?.sid;
+  if (!sid) return { ok: false, status: login.status, response: "Login did not return sid" };
+  const headers = { "X-chkp-sid": sid };
+
+  try {
+    const hostUid = await findCheckPointHostUid(config, headers, ip);
+    if (!hostUid) return { ok: true, status: "NOT_FOUND", response: "Could not find host object for IP." };
+
+    const setGroup = await requestJson({
+      url: `${baseUrl}/web_api/set-group`,
+      method: "POST",
+      headers,
+      json: { name: groupName, members: { remove: hostUid }, "details-level": "uid" },
+      config,
+    });
+    const publish = await requestJson({ url: `${baseUrl}/web_api/publish`, method: "POST", headers, json: {}, config });
+    const ok = setGroup.status === 200 && publish.status === 200 && Boolean(publish.json?.["task-id"] || publish.json?.tasks);
+    return { ok, status: setGroup.status, response: JSON.stringify({ setGroup: setGroup.json, publish: publish.json }).slice(0, 1000) };
+  } finally {
+    await requestJson({ url: `${baseUrl}/web_api/logout`, method: "POST", headers, json: {}, config }).catch(() => null);
+  }
+}
+
 async function getCheckPointHostUid(config, headers, ip) {
   const show = await requestJson({
     url: `${requireBaseUrl(config)}/web_api/show-hosts`,
@@ -398,6 +594,18 @@ async function getCheckPointHostUid(config, headers, ip) {
   return add.json?.uid || "";
 }
 
+async function findCheckPointHostUid(config, headers, ip) {
+  const show = await requestJson({
+    url: `${requireBaseUrl(config)}/web_api/show-hosts`,
+    method: "POST",
+    headers,
+    json: { filter: ip },
+    config,
+  });
+  if (Number(show.json?.total || 0) > 0) return show.json.objects?.[0]?.uid || "";
+  return "";
+}
+
 async function blockGenericHttp(config, ip, ttl, reason) {
   if (!config.endpoint) throw new Error("Endpoint is required when dry-run is disabled.");
   const endpoint = renderTemplate(config.endpoint, { ip, ttl, reason });
@@ -414,6 +622,10 @@ async function blockGenericHttp(config, ip, ttl, reason) {
   });
   const ok = config.successStatus.includes(res.status);
   return { ok, status: res.status, response: res.text.slice(0, 1000) };
+}
+
+async function unblockGenericHttp(config, ip, ttl, reason) {
+  return blockGenericHttp(config, ip, ttl, reason);
 }
 
 async function requestJson(options) {
@@ -760,6 +972,25 @@ async function runPool(items, concurrency, worker) {
   });
   await Promise.all(runners);
   return results;
+}
+
+async function handleAudit(url) {
+  const limit = clamp(Number(url.searchParams.get("limit") || 100), 1, 500);
+  if (!existsSync(auditPath)) return { entries: [] };
+  const text = await readFile(auditPath, "utf8");
+  const entries = text
+    .split(/\r?\n/)
+    .filter(Boolean)
+    .map((line) => {
+      try {
+        return JSON.parse(line);
+      } catch (error) {
+        return { action: "unknown", startedAt: "", parseError: error.message, raw: line };
+      }
+    })
+    .reverse()
+    .slice(0, limit);
+  return { entries };
 }
 
 async function appendAudit(entry) {

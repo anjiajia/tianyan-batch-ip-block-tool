@@ -197,6 +197,7 @@
         </div>
 
         <button class="danger" id="runButton">&#25191;&#34892;&#25209;&#37327;&#23553;&#31105;</button>
+        <button class="secondary-danger" id="unblockButton">&#25191;&#34892;&#25209;&#37327;&#35299;&#23553;</button>
       </aside>
     </main>
 
@@ -206,6 +207,33 @@
         <button id="downloadButton" disabled>&#19979;&#36733; CSV</button>
       </div>
       <pre id="logOutput">&#31561;&#24453;&#25805;&#20316;&#12290;</pre>
+    </section>
+
+    <section class="panel audit-panel">
+      <div class="panel-title">
+        <div>
+          <h2>&#23457;&#35745;&#35760;&#24405;</h2>
+          <span id="auditSummary">&#35760;&#24405;&#27599;&#27425;&#23553;&#31105;&#12289;&#35299;&#23553;&#21644; dry-run &#25805;&#20316;</span>
+        </div>
+        <button id="refreshAuditButton">&#21047;&#26032;</button>
+      </div>
+      <div class="table-wrap audit-table-wrap">
+        <table class="audit-table">
+          <thead>
+            <tr>
+              <th>&#26102;&#38388;</th>
+              <th>&#25805;&#20316;</th>
+              <th>&#38450;&#28779;&#22681;</th>
+              <th>&#32467;&#26524;</th>
+              <th>IP</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody id="auditBody">
+            <tr><td colspan="6" class="empty">&#26242;&#26080;&#23457;&#35745;&#35760;&#24405;&#12290;</td></tr>
+          </tbody>
+        </table>
+      </div>
     </section>
 
     <script src="/app.js" type="module"></script>
